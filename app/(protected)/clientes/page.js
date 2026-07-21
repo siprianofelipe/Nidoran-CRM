@@ -23,10 +23,12 @@ export default function ClientesPage() {
   async function salvar(form) {
     if (!form.nome) { alert('Informe o nome do cliente.'); return; }
     if (form.id) {
-      const { error } = await supabase.from('clientes').update(form).eq('id', form.id);
+      const { id, ...dados } = form;
+      const { error } = await supabase.from('clientes').update(dados).eq('id', id);
       if (error) return alert('Erro ao salvar: ' + error.message);
     } else {
-      const { error } = await supabase.from('clientes').insert([{ ...form, data_cadastro: new Date().toISOString().slice(0, 10) }]);
+      const { id, ...dados } = form;
+      const { error } = await supabase.from('clientes').insert([{ ...dados, data_cadastro: new Date().toISOString().slice(0, 10) }]);
       if (error) return alert('Erro ao salvar: ' + error.message);
     }
     setModal(null);
