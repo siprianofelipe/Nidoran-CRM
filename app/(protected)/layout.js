@@ -10,7 +10,10 @@ const NAV = [
   { href: '/pipeline', label: 'Pipeline' },
   { href: '/clientes', label: 'Clientes' },
   { href: '/apolices', label: 'Apólices' },
+  { href: '/corretores', label: 'Corretores' },
+  { href: '/corretores/financeiro', label: 'Financeiro do corretor' },
   { href: '/financeiro', label: 'Financeiro' },
+  { href: '/relatorios', label: 'Relatórios' },
   { href: '/marketing', label: 'Marketing' },
   { href: '/ia', label: 'Assistente IA' },
 ];
