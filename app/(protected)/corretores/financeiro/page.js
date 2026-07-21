@@ -103,13 +103,33 @@ export default function FinanceiroCorretorPage() {
 
   return (
     <>
-      <Topbar title="Financeiro do corretor" sub="Comissão a receber, vales e débitos" />
+      <Topbar
+        title="Financeiro do corretor"
+        sub="Comissão a receber, vales e débitos"
+        action={<button className="btn btn-primary btn-sm no-print" onClick={() => window.print()}>Imprimir extrato</button>}
+      />
       <div className="content">
-        <div className="field" style={{ maxWidth: 320, marginBottom: 20 }}>
+        <style>{`
+          @media print {
+            .no-print{ display:none !important; }
+            .sidebar{ display:none !important; }
+            .shell{ display:block !important; }
+            .signature-area{ display:block !important; }
+          }
+          .signature-area{ display:none; }
+        `}</style>
+        <div className="field no-print" style={{ maxWidth: 320, marginBottom: 20 }}>
           <label>Corretor</label>
           <select value={corretorId} onChange={(e) => setCorretorId(e.target.value)}>
             {corretores.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>
+        </div>
+
+        <div className="signature-area" style={{ marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600 }}>
+            {corretores.find((c) => c.id === corretorId)?.nome}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--slate)' }}>Extrato emitido em {new Date().toLocaleDateString('pt-BR')}</div>
         </div>
 
         {carregando ? <Loading /> : (
@@ -140,7 +160,7 @@ export default function FinanceiroCorretorPage() {
                         <td>{fmtBRL(p.valor)}</td>
                         <td>{fmtDate(p.data_prevista)}</td>
                         <td><span className={`pill ${p.status === 'Pago' ? 'ativo' : 'lead'}`}>{p.status}</span></td>
-                        <td><div className="row-actions">
+                        <td className="no-print"><div className="row-actions">
                           <button className="btn btn-ghost btn-sm" onClick={() => marcarParcela(p.id, p.status === 'Pago' ? 'Pendente' : 'Pago')}>
                             {p.status === 'Pago' ? 'Marcar pendente' : 'Marcar pago'}
                           </button>
@@ -154,7 +174,7 @@ export default function FinanceiroCorretorPage() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 24 }}>
               <div className="section-title" style={{ fontSize: 15, marginBottom: 0 }}>Vales (adiantamentos)</div>
-              <button className="btn btn-primary btn-sm" onClick={() => setModalVale({})}>+ Novo vale</button>
+              <button className="btn btn-primary btn-sm no-print" onClick={() => setModalVale({})}>+ Novo vale</button>
             </div>
             <div className="card" style={{ margin: '14px 0 24px' }}>
               {!vales.length ? <EmptyState text="Nenhum vale registrado." /> : (
@@ -168,7 +188,7 @@ export default function FinanceiroCorretorPage() {
                         <td>{v.forma_pagamento}</td>
                         <td>{v.observacao || '—'}</td>
                         <td><span className={`pill ${v.descontado ? 'ativo' : 'lead'}`}>{v.descontado ? 'Descontado' : 'Pendente'}</span></td>
-                        <td><div className="row-actions">
+                        <td className="no-print"><div className="row-actions">
                           <button className="btn btn-ghost btn-sm" onClick={() => alternarVale(v)}>{v.descontado ? 'Reabrir' : 'Descontar'}</button>
                           <button className="icon-btn" onClick={() => excluirVale(v.id)}>🗑</button>
                         </div></td>
@@ -181,7 +201,7 @@ export default function FinanceiroCorretorPage() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 24 }}>
               <div className="section-title" style={{ fontSize: 15, marginBottom: 0 }}>Débitos</div>
-              <button className="btn btn-primary btn-sm" onClick={() => setModalDebito({})}>+ Novo débito</button>
+              <button className="btn btn-primary btn-sm no-print" onClick={() => setModalDebito({})}>+ Novo débito</button>
             </div>
             <div className="card" style={{ margin: '14px 0' }}>
               {!debitos.length ? <EmptyState text="Nenhum débito registrado." /> : (
@@ -194,7 +214,7 @@ export default function FinanceiroCorretorPage() {
                         <td>{fmtBRL(d.valor)}</td>
                         <td>{d.motivo || '—'}</td>
                         <td><span className={`pill ${d.quitado ? 'ativo' : 'lead'}`}>{d.quitado ? 'Quitado' : 'Pendente'}</span></td>
-                        <td><div className="row-actions">
+                        <td className="no-print"><div className="row-actions">
                           <button className="btn btn-ghost btn-sm" onClick={() => alternarDebito(d)}>{d.quitado ? 'Reabrir' : 'Quitar'}</button>
                           <button className="icon-btn" onClick={() => excluirDebito(d.id)}>🗑</button>
                         </div></td>
@@ -203,6 +223,16 @@ export default function FinanceiroCorretorPage() {
                   </tbody>
                 </table>
               )}
+            </div>
+
+            <div className="signature-area" style={{ marginTop: 60 }}>
+              <p style={{ fontSize: 13, marginBottom: 50 }}>
+                Declaro estar ciente e de acordo com os valores de comissão, vales e débitos apresentados neste extrato.
+              </p>
+              <div style={{ borderTop: '1px solid #000', width: 320, paddingTop: 6 }}>
+                <div style={{ fontSize: 13 }}>{corretores.find((c) => c.id === corretorId)?.nome}</div>
+                <div style={{ fontSize: 11, color: 'var(--slate)' }}>Assinatura do corretor</div>
+              </div>
             </div>
           </>
         )}
