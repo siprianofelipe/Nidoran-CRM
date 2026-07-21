@@ -383,4 +383,19 @@ function ModalBaixa({ dados, onClose, onSave }) {
         <h3>Dar baixa na parcela</h3>
         <div className="grid2">
           <div className="field"><label>Valor recebido</label><input type="number" step="0.01" value={form.valor_recebido} onChange={set('valor_recebido')} /></div>
-          <div className="field"><label>Data do recebimento</label><input type="date" value={form.data_recebimento}
+          <div className="field"><label>Data do recebimento</label><input type="date" value={form.data_recebimento} onChange={set('data_recebimento')} /></div>
+          <div className="field" style={{ gridColumn: '1/-1' }}><label>Baixado por</label>
+            <input value={form.baixado_por} onChange={set('baixado_por')} placeholder="Seu nome" />
+          </div>
+        </div>
+        <div className="actions">
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary btn-sm" onClick={() => {
+            if (!form.baixado_por.trim()) { alert('Informe quem está dando a baixa.'); return; }
+            onSave(form);
+          }}>Confirmar baixa</button>
+        </div>
+      </div>
+    </div>
+  );
+}
