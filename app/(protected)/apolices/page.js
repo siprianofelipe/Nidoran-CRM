@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { Topbar, Loading, EmptyState, fmtBRL, fmtDate, diasPara } from '../../../components/UI';
 
-const TIPOS = ['Vida', 'Consórcio', 'Previdência', 'Auto'];
+const TIPOS = ['Vida', 'Consórcio', 'Previdência', 'Auto', 'Saúde'];
 const PERIODICIDADES = ['Mensal', 'Anual', 'Única'];
 const STATUSES = ['Ativa', 'Em Análise', 'Cancelada', 'Vencida'];
 
