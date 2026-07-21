@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { Topbar, Loading, fmtBRL } from '../../../components/UI';
 
-const TIPOS = ['Vida', 'Consórcio', 'Previdência', 'Auto'];
+const TIPOS = ['Vida', 'Consórcio', 'Previdência', 'Auto', 'Saúde'];
 
 export default function FinanceiroPage() {
   const [apolices, setApolices] = useState([]);
