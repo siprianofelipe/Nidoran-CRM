@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { Topbar, Loading, EmptyState } from '../../../components/UI';
 
-const TIPOS = ['Vida', 'Consórcio', 'Previdência', 'Auto'];
+const TIPOS = ['Vida', 'Consórcio', 'Previdência', 'Auto', 'Saúde'];
 
 export default function ComissionamentoPage() {
   const [regras, setRegras] = useState([]);
