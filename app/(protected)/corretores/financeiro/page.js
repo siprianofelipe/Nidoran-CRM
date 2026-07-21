@@ -15,6 +15,7 @@ export default function FinanceiroCorretorPage() {
   const [modalBaixa, setModalBaixa] = useState(null);
   const [linkAceite, setLinkAceite] = useState('');
   const [gerandoLink, setGerandoLink] = useState(false);
+  const [ultimoAceite, setUltimoAceite] = useState(null);
 
   async function carregarCorretores() {
     const { data } = await supabase.from('corretores').select('*').order('nome');
@@ -27,14 +28,16 @@ export default function FinanceiroCorretorPage() {
     if (!id) return;
     setCarregando(true);
     setLinkAceite('');
-    const [{ data: p }, { data: v }, { data: d }] = await Promise.all([
+    const [{ data: p }, { data: v }, { data: d }, { data: ac }] = await Promise.all([
       supabase.from('parcelas_comissao_corretor').select('*, apolices(numero, seguradora, clientes(nome))').eq('corretor_id', id).order('data_prevista'),
       supabase.from('vales_corretor').select('*').eq('corretor_id', id).order('data', { ascending: false }),
       supabase.from('debitos_corretor').select('*').eq('corretor_id', id).order('data', { ascending: false }),
+      supabase.from('aceites_corretor').select('*').eq('corretor_id', id).order('created_at', { ascending: false }).limit(1),
     ]);
     setParcelas(p || []);
     setVales(v || []);
     setDebitos(d || []);
+    setUltimoAceite(ac && ac[0] ? ac[0] : null);
     setCarregando(false);
   }
   useEffect(() => { if (corretorId) carregarFinanceiro(corretorId); }, [corretorId]);
@@ -188,6 +191,19 @@ export default function FinanceiroCorretorPage() {
             </span>
           )}
         </div>
+
+        {ultimoAceite && (
+          <div className="card no-print" style={{
+            padding: 14, marginBottom: 20, fontSize: 13,
+            background: ultimoAceite.status === 'Aceito' ? 'var(--bg-success, #EAF3DE)' : 'var(--bg-warning, #FAEEDA)',
+          }}>
+            {ultimoAceite.status === 'Aceito' ? (
+              <>✓ Ciência confirmada por <b>{ultimoAceite.nome_confirmado}</b> em {new Date(ultimoAceite.data_aceite).toLocaleString('pt-BR')}.</>
+            ) : (
+              <>Link de aceite gerado em {new Date(ultimoAceite.created_at).toLocaleDateString('pt-BR')} — ainda aguardando o corretor confirmar.</>
+            )}
+          </div>
+        )}
 
         {carregando ? <Loading /> : (
           <>
