@@ -12,6 +12,7 @@ export default function FinanceiroCorretorPage() {
   const [carregando, setCarregando] = useState(true);
   const [modalVale, setModalVale] = useState(null);
   const [modalDebito, setModalDebito] = useState(null);
+  const [modalBaixa, setModalBaixa] = useState(null);
   const [linkAceite, setLinkAceite] = useState('');
   const [gerandoLink, setGerandoLink] = useState(false);
 
@@ -27,7 +28,7 @@ export default function FinanceiroCorretorPage() {
     setCarregando(true);
     setLinkAceite('');
     const [{ data: p }, { data: v }, { data: d }] = await Promise.all([
-      supabase.from('parcelas_comissao_corretor').select('*, apolices(numero, seguradora)').eq('corretor_id', id).order('data_prevista'),
+      supabase.from('parcelas_comissao_corretor').select('*, apolices(numero, seguradora, clientes(nome))').eq('corretor_id', id).order('data_prevista'),
       supabase.from('vales_corretor').select('*').eq('corretor_id', id).order('data', { ascending: false }),
       supabase.from('debitos_corretor').select('*').eq('corretor_id', id).order('data', { ascending: false }),
     ]);
@@ -44,11 +45,18 @@ export default function FinanceiroCorretorPage() {
   const totalDebitosPendentes = debitos.filter((d) => !d.quitado).reduce((s, d) => s + Number(d.valor || 0), 0);
   const saldoLiquido = totalComissaoPendente - totalValesPendentes - totalDebitosPendentes;
 
-  async function marcarParcela(id, status) {
+  async function darBaixa(form) {
     const { error } = await supabase.from('parcelas_comissao_corretor')
-      .update({ status, data_pagamento: status === 'Pago' ? new Date().toISOString().slice(0, 10) : null })
-      .eq('id', id);
+      .update({
+        status: 'Pago',
+        data_pagamento: form.data_recebimento,
+        baixado_por: form.baixado_por,
+        valor_recebido: parseFloat(form.valor_recebido) || 0,
+      })
+      .eq('id', form.id)
+      .eq('status', 'Pendente'); // trava: só baixa se ainda estiver pendente
     if (error) return alert('Erro: ' + error.message);
+    setModalBaixa(null);
     carregarFinanceiro(corretorId);
   }
 
@@ -114,7 +122,7 @@ export default function FinanceiroCorretorPage() {
       debitos_pendentes: totalDebitosPendentes,
       saldo_liquido: saldoLiquido,
       parcelas: parcelas.map((p) => ({
-        apolice: p.apolices?.numero, seguradora: p.apolices?.seguradora,
+        cliente: p.apolices?.clientes?.nome, apolice: p.apolices?.numero, seguradora: p.apolices?.seguradora,
         numero_parcela: p.numero_parcela, valor: p.valor, status: p.status,
       })),
       vales: vales.map((v) => ({ data: v.data, valor: v.valor, forma: v.forma_pagamento, descontado: v.descontado })),
@@ -200,19 +208,25 @@ export default function FinanceiroCorretorPage() {
             <div className="card" style={{ marginBottom: 24 }}>
               {!parcelas.length ? <EmptyState text="Nenhuma parcela de comissão cadastrada para esse corretor." /> : (
                 <table>
-                  <thead><tr><th>Apólice</th><th>Parcela</th><th>Valor</th><th>Prevista para</th><th>Status</th><th></th></tr></thead>
+                  <thead><tr><th>Cliente</th><th>Parcela</th><th>Valor</th><th>Prevista para</th><th>Status</th><th></th></tr></thead>
                   <tbody>
                     {parcelas.map((p) => (
                       <tr key={p.id}>
-                        <td>{p.apolices?.numero || '—'}<div style={{ fontSize: 11.5, color: 'var(--slate)' }}>{p.apolices?.seguradora}</div></td>
+                        <td>{p.apolices?.clientes?.nome || '—'}<div style={{ fontSize: 11.5, color: 'var(--slate)' }}>{p.apolices?.numero} · {p.apolices?.seguradora}</div></td>
                         <td>{p.numero_parcela}ª de {parcelas.filter((x) => x.apolice_id === p.apolice_id).length}</td>
                         <td>{fmtBRL(p.valor)}</td>
                         <td>{fmtDate(p.data_prevista)}</td>
-                        <td><span className={`pill ${p.status === 'Pago' ? 'ativo' : 'lead'}`}>{p.status}</span></td>
+                        <td>
+                          {p.status === 'Pago' ? (
+                            <span className="pill ativo" title={`Recebido em ${fmtDate(p.data_pagamento)}`}>Pago · baixado por {p.baixado_por}</span>
+                          ) : (
+                            <span className="pill lead">Pendente</span>
+                          )}
+                        </td>
                         <td className="no-print"><div className="row-actions">
-                          <button className="btn btn-ghost btn-sm" onClick={() => marcarParcela(p.id, p.status === 'Pago' ? 'Pendente' : 'Pago')}>
-                            {p.status === 'Pago' ? 'Marcar pendente' : 'Marcar pago'}
-                          </button>
+                          {p.status !== 'Pago' && (
+                            <button className="btn btn-ghost btn-sm" onClick={() => setModalBaixa({ id: p.id, valor_recebido: p.valor })}>Dar baixa</button>
+                          )}
                         </div></td>
                       </tr>
                     ))}
@@ -289,6 +303,7 @@ export default function FinanceiroCorretorPage() {
 
       {modalVale && <ModalVale vale={modalVale} onClose={() => setModalVale(null)} onSave={salvarVale} />}
       {modalDebito && <ModalDebito debito={modalDebito} onClose={() => setModalDebito(null)} onSave={salvarDebito} />}
+      {modalBaixa && <ModalBaixa dados={modalBaixa} onClose={() => setModalBaixa(null)} onSave={darBaixa} />}
     </>
   );
 }
@@ -353,3 +368,19 @@ function ModalDebito({ debito, onClose, onSave }) {
     </div>
   );
 }
+
+function ModalBaixa({ dados, onClose, onSave }) {
+  const [form, setForm] = useState({
+    id: dados.id,
+    valor_recebido: dados.valor_recebido || '',
+    data_recebimento: new Date().toISOString().slice(0, 10),
+    baixado_por: '',
+  });
+  const set = (campo) => (e) => setForm({ ...form, [campo]: e.target.value });
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <h3>Dar baixa na parcela</h3>
+        <div className="grid2">
+          <div className="field"><label>Valor recebido</label><input type="number" step="0.01" value={form.valor_recebido} onChange={set('valor_recebido')} /></div>
+          <div className="field"><label>Data do recebimento</label><input type="date" value={form.data_recebimento}
