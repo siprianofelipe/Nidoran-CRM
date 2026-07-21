@@ -8,7 +8,7 @@ function urgencyOf(dias) {
   if (dias <= 30) return { color: 'var(--amber)', bg: 'var(--amber-bg)', tag: 'Atenção' };
   return { color: 'var(--sage)', bg: 'var(--sage-bg)', tag: 'Tranquilo' };
 }
-const TIPOS = ['Vida', 'Consórcio', 'Previdência', 'Auto'];
+const TIPOS = ['Vida', 'Consórcio', 'Previdência', 'Auto', 'Saúde'];
 
 export default function DashboardPage() {
   const [clientes, setClientes] = useState([]);
