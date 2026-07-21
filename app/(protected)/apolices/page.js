@@ -11,6 +11,7 @@ export default function ApolicesPage() {
   const [apolices, setApolices] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [comissoes, setComissoes] = useState([]);
+  const [corretores, setCorretores] = useState([]);
   const [dependentesCount, setDependentesCount] = useState({});
   const [carregando, setCarregando] = useState(true);
   const [filtroTipo, setFiltroTipo] = useState('');
@@ -19,15 +20,17 @@ export default function ApolicesPage() {
 
   async function carregar() {
     setCarregando(true);
-    const [{ data: a }, { data: c }, { data: com }, { data: dep }] = await Promise.all([
+    const [{ data: a }, { data: c }, { data: com }, { data: dep }, { data: cor }] = await Promise.all([
       supabase.from('apolices').select('*').order('data_vencimento'),
       supabase.from('clientes').select('*').order('nome'),
       supabase.from('tabela_comissoes').select('*'),
       supabase.from('dependentes').select('apolice_id'),
+      supabase.from('corretores').select('*').eq('ativo', true).order('nome'),
     ]);
     setApolices(a || []);
     setClientes(c || []);
     setComissoes(com || []);
+    setCorretores(cor || []);
     const contagem = {};
     (dep || []).forEach((d) => { contagem[d.apolice_id] = (contagem[d.apolice_id] || 0) + 1; });
     setDependentesCount(contagem);
@@ -39,15 +42,47 @@ export default function ApolicesPage() {
 
   async function salvar(form) {
     if (!form.data_vencimento) { alert('Informe a data de vencimento.'); return; }
-    const payload = { ...form, premio: parseFloat(form.premio) || 0, comissao_pct: parseFloat(form.comissao_pct) || 0 };
+    const payload = {
+      ...form,
+      premio: parseFloat(form.premio) || 0,
+      comissao_pct: parseFloat(form.comissao_pct) || 0,
+      corretor_id: form.corretor_id || null,
+      comissao_corretor_pct: parseFloat(form.comissao_corretor_pct) || 0,
+      comissao_corretor_parcelas: parseInt(form.comissao_corretor_parcelas) || 1,
+    };
+    let apoliceId = form.id;
     if (form.id) {
       const { error } = await supabase.from('apolices').update(payload).eq('id', form.id);
       if (error) return alert('Erro: ' + error.message);
     } else {
       delete payload.id;
-      const { error } = await supabase.from('apolices').insert([payload]);
+      const { data, error } = await supabase.from('apolices').insert([payload]).select().single();
       if (error) return alert('Erro: ' + error.message);
+      apoliceId = data.id;
     }
+
+    // Regera as parcelas de comissão do corretor com base no % e no nº de parcelas informados
+    await supabase.from('parcelas_comissao_corretor').delete().eq('apolice_id', apoliceId);
+    if (payload.corretor_id && payload.comissao_corretor_pct > 0) {
+      const totalComissao = payload.premio * payload.comissao_corretor_pct / 100;
+      const n = payload.comissao_corretor_parcelas;
+      const valorParcela = Math.round((totalComissao / n) * 100) / 100;
+      const parcelas = Array.from({ length: n }, (_, i) => {
+        const data = payload.data_inicio ? new Date(payload.data_inicio + 'T00:00:00') : new Date();
+        data.setMonth(data.getMonth() + i);
+        return {
+          apolice_id: apoliceId,
+          corretor_id: payload.corretor_id,
+          numero_parcela: i + 1,
+          valor: valorParcela,
+          data_prevista: data.toISOString().slice(0, 10),
+          status: 'Pendente',
+        };
+      });
+      const { error: errParc } = await supabase.from('parcelas_comissao_corretor').insert(parcelas);
+      if (errParc) alert('Apólice salva, mas houve um erro ao gerar as parcelas de comissão: ' + errParc.message);
+    }
+
     setModal(null);
     carregar();
   }
@@ -108,13 +143,13 @@ export default function ApolicesPage() {
         </div>
       </div>
       {modal !== null && (
-        <ApoliceModal apolice={modal} clientes={clientes} comissoes={comissoes} onClose={() => setModal(null)} onSave={salvar} />
+        <ApoliceModal apolice={modal} clientes={clientes} comissoes={comissoes} corretores={corretores} onClose={() => setModal(null)} onSave={salvar} />
       )}
     </>
   );
 }
 
-function ApoliceModal({ apolice, clientes, comissoes, onClose, onSave }) {
+function ApoliceModal({ apolice, clientes, comissoes, corretores, onClose, onSave }) {
   const [form, setForm] = useState({
     id: apolice.id,
     cliente_id: apolice.cliente_id || clientes[0]?.id || '',
@@ -127,6 +162,9 @@ function ApoliceModal({ apolice, clientes, comissoes, onClose, onSave }) {
     data_inicio: apolice.data_inicio || '',
     data_vencimento: apolice.data_vencimento || '',
     status: apolice.status || 'Ativa',
+    corretor_id: apolice.corretor_id || '',
+    comissao_corretor_pct: apolice.comissao_corretor_pct || '',
+    comissao_corretor_parcelas: apolice.comissao_corretor_parcelas || 1,
   });
   const [hint, setHint] = useState('Preenche sozinho ao escolher tipo + seguradora, se houver regra cadastrada.');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -179,6 +217,32 @@ function ApoliceModal({ apolice, clientes, comissoes, onClose, onSave }) {
               {STATUSES.map((s) => <option key={s}>{s}</option>)}
             </select>
           </div>
+        </div>
+
+        <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+          <div className="section-title" style={{ fontSize: 14, marginBottom: 10 }}>Corretor responsável</div>
+          <div className="grid2">
+            <div className="field" style={{ gridColumn: '1/-1' }}><label>Corretor</label>
+              <select value={form.corretor_id} onChange={set('corretor_id')}>
+                <option value="">Nenhum</option>
+                {corretores.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Taxa de comissão do corretor (%)</label>
+              <input type="number" step="0.1" value={form.comissao_corretor_pct} onChange={set('comissao_corretor_pct')} />
+            </div>
+            <div className="field"><label>Em quantas parcelas</label>
+              <input type="number" min="1" step="1" value={form.comissao_corretor_parcelas} onChange={set('comissao_corretor_parcelas')} />
+            </div>
+          </div>
+          {form.corretor_id && form.comissao_corretor_pct > 0 && form.premio > 0 && (
+            <p style={{ fontSize: 12, color: 'var(--slate)', marginTop: 4 }}>
+              Comissão total: {fmtBRL((parseFloat(form.premio) || 0) * (parseFloat(form.comissao_corretor_pct) || 0) / 100)}
+              {' '}em {form.comissao_corretor_parcelas}x de{' '}
+              {fmtBRL(((parseFloat(form.premio) || 0) * (parseFloat(form.comissao_corretor_pct) || 0) / 100) / (parseInt(form.comissao_corretor_parcelas) || 1))}
+              . Ao salvar, as parcelas são geradas em Corretores → Financeiro.
+            </p>
+          )}
         </div>
 
         {apolice.id ? (
