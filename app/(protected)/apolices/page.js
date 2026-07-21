@@ -11,6 +11,7 @@ export default function ApolicesPage() {
   const [apolices, setApolices] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [comissoes, setComissoes] = useState([]);
+  const [dependentesCount, setDependentesCount] = useState({});
   const [carregando, setCarregando] = useState(true);
   const [filtroTipo, setFiltroTipo] = useState('');
   const [busca, setBusca] = useState('');
@@ -18,14 +19,18 @@ export default function ApolicesPage() {
 
   async function carregar() {
     setCarregando(true);
-    const [{ data: a }, { data: c }, { data: com }] = await Promise.all([
+    const [{ data: a }, { data: c }, { data: com }, { data: dep }] = await Promise.all([
       supabase.from('apolices').select('*').order('data_vencimento'),
       supabase.from('clientes').select('*').order('nome'),
       supabase.from('tabela_comissoes').select('*'),
+      supabase.from('dependentes').select('apolice_id'),
     ]);
     setApolices(a || []);
     setClientes(c || []);
     setComissoes(com || []);
+    const contagem = {};
+    (dep || []).forEach((d) => { contagem[d.apolice_id] = (contagem[d.apolice_id] || 0) + 1; });
+    setDependentesCount(contagem);
     setCarregando(false);
   }
   useEffect(() => { carregar(); }, []);
@@ -83,7 +88,7 @@ export default function ApolicesPage() {
                   const dias = diasPara(a.data_vencimento);
                   return (
                     <tr key={a.id}>
-                      <td><b>{nomeCliente(a.cliente_id)}</b></td>
+                      <td><b>{nomeCliente(a.cliente_id)}</b>{dependentesCount[a.id] ? <div style={{ fontSize: 11.5, color: 'var(--slate)' }}>+{dependentesCount[a.id]} dependente(s)</div> : null}</td>
                       <td>{a.tipo}</td>
                       <td>{a.seguradora}<div style={{ fontSize: 11.5, color: 'var(--slate)' }}>{a.numero}</div></td>
                       <td>{fmtBRL(a.premio)}<div style={{ fontSize: 11.5, color: 'var(--slate)' }}>{a.periodicidade}</div></td>
@@ -175,11 +180,92 @@ function ApoliceModal({ apolice, clientes, comissoes, onClose, onSave }) {
             </select>
           </div>
         </div>
+
+        {apolice.id ? (
+          <DependentesSection apoliceId={apolice.id} />
+        ) : (
+          <p style={{ fontSize: 12, color: 'var(--slate)', marginTop: 4 }}>
+            Salve a apólice primeiro — depois de salva, abra-a de novo para adicionar dependentes/beneficiários.
+          </p>
+        )}
+
         <div className="actions">
           <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancelar</button>
           <button className="btn btn-primary btn-sm" onClick={() => onSave(form)}>Salvar</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function DependentesSection({ apoliceId }) {
+  const [dependentes, setDependentes] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [novoNome, setNovoNome] = useState('');
+  const [novoNascimento, setNovoNascimento] = useState('');
+  const [novoParentesco, setNovoParentesco] = useState('');
+
+  async function carregar() {
+    setCarregando(true);
+    const { data } = await supabase.from('dependentes').select('*').eq('apolice_id', apoliceId).order('data_nascimento');
+    setDependentes(data || []);
+    setCarregando(false);
+  }
+  useEffect(() => { carregar(); }, [apoliceId]);
+
+  async function adicionar() {
+    if (!novoNome.trim()) { alert('Informe o nome do dependente.'); return; }
+    const { error } = await supabase.from('dependentes').insert([{
+      apolice_id: apoliceId, nome: novoNome.trim(),
+      data_nascimento: novoNascimento || null, parentesco: novoParentesco || null,
+    }]);
+    if (error) return alert('Erro: ' + error.message);
+    setNovoNome(''); setNovoNascimento(''); setNovoParentesco('');
+    carregar();
+  }
+  async function remover(id) {
+    const { error } = await supabase.from('dependentes').delete().eq('id', id);
+    if (error) return alert('Erro: ' + error.message);
+    carregar();
+  }
+
+  return (
+    <div style={{ marginTop: 20, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+      <div className="section-title" style={{ fontSize: 14, marginBottom: 10 }}>Dependentes / Beneficiários</div>
+      {carregando ? <Loading /> : (
+        <>
+          {dependentes.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              {dependentes.map((d) => (
+                <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
+                  <div style={{ flex: 1 }}>
+                    <b style={{ fontSize: 13 }}>{d.nome}</b>
+                    <span style={{ fontSize: 12, color: 'var(--slate)', marginLeft: 8 }}>
+                      {d.parentesco ? d.parentesco + ' · ' : ''}{d.data_nascimento ? fmtDate(d.data_nascimento) : 'sem data de nascimento'}
+                    </span>
+                  </div>
+                  <button className="icon-btn" onClick={() => remover(d.id)}>🗑</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="grid2" style={{ gridTemplateColumns: '1.4fr 1fr 1fr', alignItems: 'end' }}>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Nome</label>
+              <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome do dependente" />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Nascimento</label>
+              <input type="date" value={novoNascimento} onChange={(e) => setNovoNascimento(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Parentesco</label>
+              <input value={novoParentesco} onChange={(e) => setNovoParentesco(e.target.value)} placeholder="Cônjuge, filho(a)..." />
+            </div>
+          </div>
+          <button className="btn btn-ghost btn-sm" style={{ marginTop: 10 }} onClick={adicionar}>+ Adicionar dependente</button>
+        </>
+      )}
     </div>
   );
 }
