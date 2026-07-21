@@ -4,7 +4,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { Topbar, Loading, fmtBRL } from '../../../components/UI';
 
 const ETAPAS = ['Novo lead', 'Em contato', 'Proposta enviada', 'Fechado', 'Perdido'];
-const TIPOS = ['Vida', 'Consórcio', 'Previdência', 'Auto', 'Saúde];
+const TIPOS = ['Vida', 'Consórcio', 'Previdência', 'Auto', 'Saúde'];
 
 export default function PipelinePage() {
   const [negocios, setNegocios] = useState([]);
