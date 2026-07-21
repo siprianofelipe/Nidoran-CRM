@@ -12,6 +12,8 @@ export default function FinanceiroCorretorPage() {
   const [carregando, setCarregando] = useState(true);
   const [modalVale, setModalVale] = useState(null);
   const [modalDebito, setModalDebito] = useState(null);
+  const [linkAceite, setLinkAceite] = useState('');
+  const [gerandoLink, setGerandoLink] = useState(false);
 
   async function carregarCorretores() {
     const { data } = await supabase.from('corretores').select('*').order('nome');
@@ -23,6 +25,7 @@ export default function FinanceiroCorretorPage() {
   async function carregarFinanceiro(id) {
     if (!id) return;
     setCarregando(true);
+    setLinkAceite('');
     const [{ data: p }, { data: v }, { data: d }] = await Promise.all([
       supabase.from('parcelas_comissao_corretor').select('*, apolices(numero, seguradora)').eq('corretor_id', id).order('data_prevista'),
       supabase.from('vales_corretor').select('*').eq('corretor_id', id).order('data', { ascending: false }),
@@ -101,6 +104,35 @@ export default function FinanceiroCorretorPage() {
     carregarFinanceiro(corretorId);
   }
 
+  async function gerarLinkAceite() {
+    setGerandoLink(true);
+    const corretor = corretores.find((c) => c.id === corretorId);
+    const resumo = {
+      comissao_pendente: totalComissaoPendente,
+      comissao_paga: totalComissaoPaga,
+      vales_pendentes: totalValesPendentes,
+      debitos_pendentes: totalDebitosPendentes,
+      saldo_liquido: saldoLiquido,
+      parcelas: parcelas.map((p) => ({
+        apolice: p.apolices?.numero, seguradora: p.apolices?.seguradora,
+        numero_parcela: p.numero_parcela, valor: p.valor, status: p.status,
+      })),
+      vales: vales.map((v) => ({ data: v.data, valor: v.valor, forma: v.forma_pagamento, descontado: v.descontado })),
+      debitos: debitos.map((d) => ({ data: d.data, valor: d.valor, motivo: d.motivo, quitado: d.quitado })),
+    };
+    const { data, error } = await supabase.from('aceites_corretor')
+      .insert([{ corretor_id: corretorId, corretor_nome: corretor?.nome, resumo }])
+      .select().single();
+    setGerandoLink(false);
+    if (error) return alert('Erro ao gerar o link: ' + error.message);
+    setLinkAceite(`${window.location.origin}/aceite/${data.token}`);
+  }
+
+  function copiarLink() {
+    navigator.clipboard.writeText(linkAceite);
+    alert('Link copiado! Agora é só colar no e-mail ou WhatsApp do corretor.');
+  }
+
   return (
     <>
       <Topbar
@@ -118,6 +150,7 @@ export default function FinanceiroCorretorPage() {
           }
           .signature-area{ display:none; }
         `}</style>
+
         <div className="field no-print" style={{ maxWidth: 320, marginBottom: 20 }}>
           <label>Corretor</label>
           <select value={corretorId} onChange={(e) => setCorretorId(e.target.value)}>
@@ -130,6 +163,22 @@ export default function FinanceiroCorretorPage() {
             {corretores.find((c) => c.id === corretorId)?.nome}
           </div>
           <div style={{ fontSize: 12, color: 'var(--slate)' }}>Extrato emitido em {new Date().toLocaleDateString('pt-BR')}</div>
+        </div>
+
+        <div className="card no-print" style={{ padding: 18, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <button className="btn btn-primary btn-sm" disabled={gerandoLink} onClick={gerarLinkAceite}>
+            {gerandoLink ? 'Gerando...' : 'Gerar link de aceite digital'}
+          </button>
+          {linkAceite ? (
+            <>
+              <input readOnly value={linkAceite} style={{ flex: 1, minWidth: 220, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 4, fontSize: 12.5 }} onFocus={(e) => e.target.select()} />
+              <button className="btn btn-ghost btn-sm" onClick={copiarLink}>Copiar link</button>
+            </>
+          ) : (
+            <span style={{ fontSize: 12.5, color: 'var(--slate)' }}>
+              Gera um link único com os valores de agora, pro corretor abrir e confirmar de ciência.
+            </span>
+          )}
         </div>
 
         {carregando ? <Loading /> : (
