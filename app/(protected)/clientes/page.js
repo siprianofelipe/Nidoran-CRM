@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
-import { Topbar, Loading, EmptyState } from '../../../components/UI';
+import { Topbar, Loading, EmptyState, fmtDate } from '../../../components/UI';
 
 const ORIGENS = ['Indicação', 'Site', 'Redes sociais', 'Telefone', 'Outro'];
 const STATUSES = ['Lead', 'Ativo', 'Inativo'];
@@ -64,7 +64,7 @@ export default function ClientesPage() {
           ) : (
             <table>
               <thead>
-                <tr><th>Nome</th><th>Contato</th><th>Cidade</th><th>Origem</th><th>Status</th><th></th></tr>
+                <tr><th>Nome</th><th>Contato</th><th>Cidade</th><th>Nascimento</th><th>Origem</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
                 {lista.map((c) => (
@@ -72,6 +72,7 @@ export default function ClientesPage() {
                     <td><b>{c.nome}</b><div style={{ fontSize: 11.5, color: 'var(--slate)' }}>{c.cpf}</div></td>
                     <td>{c.telefone}<div style={{ fontSize: 11.5, color: 'var(--slate)' }}>{c.email}</div></td>
                     <td>{c.cidade}</td>
+                    <td>{c.data_nascimento ? fmtDate(c.data_nascimento) : '—'}</td>
                     <td>{c.origem}</td>
                     <td><span className={`pill ${c.status?.toLowerCase()}`}>{c.status}</span></td>
                     <td>
@@ -97,8 +98,10 @@ function ClienteModal({ cliente, onClose, onSave }) {
     id: cliente.id,
     nome: cliente.nome || '',
     cpf: cliente.cpf || '',
+    data_nascimento: cliente.data_nascimento || '',
     telefone: cliente.telefone || '',
     email: cliente.email || '',
+    endereco: cliente.endereco || '',
     cidade: cliente.cidade || '',
     origem: cliente.origem || ORIGENS[0],
     status: cliente.status || 'Lead',
@@ -112,8 +115,10 @@ function ClienteModal({ cliente, onClose, onSave }) {
         <div className="grid2">
           <div className="field" style={{ gridColumn: '1/-1' }}><label>Nome completo</label><input value={form.nome} onChange={set('nome')} /></div>
           <div className="field"><label>CPF</label><input value={form.cpf} onChange={set('cpf')} /></div>
+          <div className="field"><label>Data de nascimento</label><input type="date" value={form.data_nascimento} onChange={set('data_nascimento')} /></div>
           <div className="field"><label>Telefone</label><input value={form.telefone} onChange={set('telefone')} /></div>
           <div className="field" style={{ gridColumn: '1/-1' }}><label>E-mail</label><input value={form.email} onChange={set('email')} /></div>
+          <div className="field" style={{ gridColumn: '1/-1' }}><label>Endereço</label><input value={form.endereco} onChange={set('endereco')} placeholder="Rua, número, bairro" /></div>
           <div className="field"><label>Cidade/UF</label><input value={form.cidade} onChange={set('cidade')} /></div>
           <div className="field"><label>Origem do lead</label>
             <select value={form.origem} onChange={set('origem')}>
